@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 SAVE_REGEX = re.compile(r"\[\[SAVE:([a-z_]+)\|([^|]+)\|([\s\S]+?)\]\]")
+LINK_REGEX = re.compile(r"\[\[LINK:([^|\]]+)\|([^\]]+)\]\]")
 
 
 # ---------- NOTES ----------
@@ -101,10 +102,29 @@ async def chat(req: schemas.ChatRequest, db: Session = Depends(get_db)):
     match = SAVE_REGEX.search(reply)
     if match:
         area, title, body = match.group(1).strip(), match.group(2).strip(), match.group(3).strip()
-        saved_note = crud.upsert_note(db, area, title, body)
-        reply = SAVE_REGEX.sub("", reply).strip()
+        link_matches = LINK_REGEX.findall(reply)
+        link_titles = [b.strip() for (a, b) in link_matches if a.strip().lower() == title.lower()]
+        saved_note = crud.upsert_note(db, area, title, body, link_titles=link_titles or None)
+
+    reply = SAVE_REGEX.sub("", reply)
+    reply = LINK_REGEX.sub("", reply)
+    reply = reply.strip()
 
     return schemas.ChatResponse(reply=reply, saved_note=saved_note)
+
+
+@app.post("/relations/repair")
+def repair_relations(db: Session = Depends(get_db)):
+    """Conecta notas que ficaram órfãs (criadas antes deste fix). Idempotente — pode rodar quantas vezes quiser."""
+    all_notes = crud.list_notes(db)
+    connected_ids = set()
+    for rel in crud.list_relations(db):
+        connected_ids.add(rel.note_a)
+        connected_ids.add(rel.note_b)
+    orphans = [n for n in all_notes if n.id not in connected_ids]
+    for note in orphans:
+        crud.auto_connect(db, note)
+    return {"orphans_fixed": len(orphans)}
 
 
 @app.get("/health")

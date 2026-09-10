@@ -224,6 +224,7 @@
       <div class="brain-right">
         <span id="sb-count">0 notas · 0 áreas</span>
         <button id="addNoteBtn" title="Nova nota">＋</button>
+        <button id="repairBtn" title="Conectar notas órfãs">🔗</button>
         <button id="reloadBtn" title="Recarregar">⟳</button>
       </div>
     </div>
@@ -638,7 +639,7 @@ function renderGraph(){
     if(!A || !B) return;
     const midx=(A.x+B.x)/2, midy=(A.y+B.y)/2;
     const cx = midx + (500-midx)*0.35, cy = midy + (270-midy)*0.35;
-    edges += `<path d="M ${A.x} ${A.y} Q ${cx} ${cy} ${B.x} ${B.y}" stroke="url(#edgeGrad)" stroke-width="1.3" fill="none" class="edge-flow" opacity="0.5"/>`;
+    edges += `<path d="M ${A.x} ${A.y} Q ${cx} ${cy} ${B.x} ${B.y}" stroke="url(#edgeGrad)" stroke-width="1.8" fill="none" class="edge-flow" opacity="0.7"/>`;
     currentEdgesForPulses.push({ A:{x:A.x,y:A.y}, C:{x:cx,y:cy}, B:{x:B.x,y:B.y} });
   });
 
@@ -646,7 +647,7 @@ function renderGraph(){
     const color = (AREA[n.area] || AREA.meta).color;
     const deg = degree[n.id] || 0;
     const r = Math.min(13 + deg*1.6, 30);
-    rays += `<line x1="500" y1="270" x2="${n.x}" y2="${n.y}" stroke="${color}" stroke-width="1" opacity="0.15"/>`;
+    rays += `<line x1="500" y1="270" x2="${n.x}" y2="${n.y}" stroke="${color}" stroke-width="1.2" opacity="0.25"/>`;
     rings += `<circle cx="${n.x}" cy="${n.y}" r="${r+7}" fill="none" stroke="${color}" stroke-width="1.2" class="node-ring" style="animation-delay:${(i%6)*0.3}s" opacity="0.5"/>`;
     nodes += `<g class="note-node" onclick="window.editNote('${n.id}')">
       <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${color}" filter="url(#glow)" id="node-${n.id}"/>
@@ -778,6 +779,17 @@ window.addNote = function(){
 
 document.getElementById("addNoteBtn").addEventListener("click", () => window.addNote());
 document.getElementById("reloadBtn").addEventListener("click", () => loadStateFromBackend());
+document.getElementById("repairBtn").addEventListener("click", async () => {
+  setStatus("conectando notas órfãs...");
+  try{
+    const res = await fetch(`${BACKEND_URL}/relations/repair`, { method: "POST" });
+    const data = await res.json();
+    setStatus(`${data.orphans_fixed} nota(s) reconectada(s)`);
+    await loadStateFromBackend();
+  }catch(e){
+    setStatus("erro ao reparar conexões");
+  }
+});
 
 document.getElementById("m-cancel").addEventListener("click", () => {
   document.getElementById("modal-overlay").classList.add("hidden");
